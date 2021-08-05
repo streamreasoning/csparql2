@@ -29,9 +29,11 @@ import it.polimi.yasper.core.stream.web.WebStream;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j;
 import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Triple;
 import org.apache.jena.mem.GraphMem;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.rdf.model.impl.InfModelImpl;
 import org.apache.jena.reasoner.InfGraph;
 import org.apache.jena.reasoner.Reasoner;
@@ -39,6 +41,7 @@ import org.apache.jena.reasoner.ReasonerRegistry;
 import org.apache.jena.riot.system.IRIResolver;
 import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.graph.GraphFactory;
+import org.apache.jena.util.iterator.ExtendedIterator;
 
 import java.util.List;
 import java.util.Map;
@@ -128,9 +131,18 @@ public class SDSManagerImpl implements SDSManager {
                 InfGraph infGraph = new InfModelImpl(this.reasoner.bind(m.read(g).getGraph())).getInfGraph();
                 this.sds.add(new TimeVaryingStatic<>(sds, infGraph));
             } else {
-                this.sds.add(new TimeVaryingStatic<>(sds, GraphFactory.createGraphMem()));
+                Graph staticGraph = GraphFactory.createGraphMem();
+                // load static data
+                StmtIterator stmtIt = m.listStatements();
+                while(stmtIt.hasNext()){
+                    staticGraph.add(stmtIt.nextStatement().asTriple());
+                }
+                this.sds.add(new TimeVaryingStatic<>(sds, staticGraph));
             }
         });
+        // Remove graph and name graph definitions from query after loading
+        query.getGraphURIs().clear();
+        query.getNamedGraphURIs().clear();
 
         Map<String, WebDataStream<Graph>> registeredStreams = stream_registration_service.getRegisteredStreams();
 
